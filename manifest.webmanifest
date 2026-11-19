@@ -1,0 +1,10 @@
+{
+  "name": "Maxim Boost - Asisten Driver",
+  "short_name": "Maxim Boost",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f6f4",
+  "theme_color": "#087b4b",
+  "description": "Asisten pencatat order dan strategi driver Maxim",
+  "icons": []
+}

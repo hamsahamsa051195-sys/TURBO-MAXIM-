@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#087b4b">
+<title>Maxim Boost – Asisten Driver</title>
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{--green:#087b4b;--bg:#f3f6f4;--ink:#17221c;--muted:#64736a;--line:#dce5df}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px system-ui,-apple-system,Segoe UI,sans-serif}
+header{background:var(--green);color:white;padding:22px 18px 26px;border-radius:0 0 22px 22px}
+header h1{margin:0;font-size:25px}header p{margin:5px 0 0;opacity:.9;font-size:13px}
+main{max-width:680px;margin:auto;padding:14px;display:grid;gap:13px}
+.card{background:white;border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 2px 8px #102b1910}
+h2{font-size:17px;margin:0 0 12px}.muted{color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#f1f8f3;border-radius:12px;padding:12px 8px;text-align:center}.stat b{display:block;font-size:20px;color:var(--green)}.stat span{font-size:11px;color:var(--muted)}
+button{border:0;border-radius:11px;background:var(--green);color:white;padding:12px 14px;font-weight:650;font-size:14px;cursor:pointer}
+button.secondary{background:#e7f2eb;color:#075b39}button.danger{background:#fff0ed;color:#a32b1d}
+.actions{display:flex;gap:8px;flex-wrap:wrap}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;background:white;color:var(--ink);margin:5px 0 11px}
+label{font-size:13px;font-weight:600}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tip{background:#f0f7f2;border-left:4px solid var(--green);padding:12px;border-radius:8px;font-size:14px}
+#gps{font-size:13px;overflow-wrap:anywhere}.order{padding:10px 0;border-bottom:1px solid var(--line);font-size:13px}.order:last-child{border:0}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:8px 20px 24px}
+@media(max-width:380px){.stats{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>🚲 MAXIM BOOST</h1><p>Asisten pribadi untuk strategi driver Maxim</p></header>
+<main>
+<section class="card">
+<h2>Ringkasan hari ini</h2>
+<div class="stats">
+<div class="stat"><b id="orders">0</b><span>Order dicatat</span></div>
+<div class="stat"><b id="income">Rp0</b><span>Pendapatan</span></div>
+<div class="stat"><b id="avg">Rp0</b><span>Rata-rata/order</span></div>
+</div>
+<p class="muted" id="today"></p>
+</section>
+<section class="card">
+<h2>📍 Lokasi & GPS</h2>
+<p id="gps" class="muted">Lokasi belum diambil. Tekan tombol untuk meminta izin lokasi.</p>
+<div class="actions">
+<button id="locate">Ambil lokasi GPS</button>
+<button class="secondary" id="maps" disabled>Buka sekitar di Maps</button>
+</div>
+<p class="muted">GPS hanya mengambil lokasi saat kamu menekan tombol. Pastikan izin lokasi browser diaktifkan.</p>
+</section>
+<section class="card">
+<h2>🧭 Saran waktu kerja</h2>
+<div class="tip" id="tip"></div>
+<p class="muted">Ini panduan umum, bukan data permintaan order langsung dari Maxim. Cocokkan dengan pengalaman dan kondisi sekitar.</p>
+</section>
+<section class="card">
+<h2>➕ Catat order selesai</h2>
+<form id="orderForm">
+<label>Lokasi/area penjemputan</label><input id="area" placeholder="Contoh: Bahodopi, dekat pasar" required>
+<div class="grid2">
+<div><label>Pendapatan (Rp)</label><input id="amount" type="number" min="0" step="500" placeholder="15000" required></div>
+<div><label>Jam order</label><input id="ordertime" type="time" required></div>
+</div>
+<label>Catatan (opsional)</label><input id="note" placeholder="Contoh: dapat setelah menunggu 10 menit">
+<button type="submit">Simpan order</button>
+</form>
+</section>
+<section class="card">
+<h2>📒 Riwayat hari ini</h2>
+<div id="history" class="muted">Belum ada order dicatat hari ini.</div>
+<div class="actions" style="margin-top:12px"><button class="secondary" id="export">Ekspor catatan CSV</button><button class="danger" id="clear">Hapus semua catatan</button></div>
+</section>
+<section class="card">
+<h2>Privasi & batasan</h2>
+<p class="muted">Catatan disimpan di penyimpanan browser HP ini. Aplikasi tidak terhubung ke server Maxim, tidak membaca order masuk, tidak mengubah prioritas akun, dan tidak menjamin order bertambah. Jangan gunakan saat berkendara.</p>
+</section>
+</main>
+<footer>MAXIM BOOST • Versi percobaan 1.0</footer>
+<script>
+const $=id=>document.getElementById(id);
+const key='maximBoostOrdersV1';
+let coords=null;
+function all(){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return[]}}
+function save(a){localStorage.setItem(key,JSON.stringify(a))}
+function dateKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function rupiah(n){return 'Rp'+Number(n||0).toLocaleString('id-ID')}
+function render(){
+ const list=all(), today=list.filter(x=>x.date===dateKey()), total=today.reduce((s,x)=>s+Number(x.amount),0);
+ $('orders').textContent=today.length;$('income').textContent=rupiah(total);$('avg').textContent=rupiah(today.length?Math.round(total/today.length):0);
+ $('today').textContent='Tanggal: '+new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+ $('history').innerHTML=today.length?today.slice().reverse().map(x=>`<div class="order"><b>${esc(x.area)}</b> • ${x.time}<br>${rupiah(x.amount)}${x.note?' • '+esc(x.note):''}</div>`).join(''):'Belum ada order dicatat hari ini.';
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function advice(){
+ const h=new Date().getHours();let msg;
+ if(h>=5&&h<9)msg='Pagi: coba pantau area permukiman, pasar, tempat makan, dan titik antar-jemput pekerja. Bandingkan hasil di beberapa titik.';
+ else if(h>=9&&h<11)msg='Menjelang siang: amati area pertokoan, perkantoran, klinik, dan pusat aktivitas warga.';
+ else if(h>=11&&h<14)msg='Jam makan siang: perhatikan area warung, rumah makan, pasar, dan pusat kegiatan. Jangan menunggu terlalu lama di satu titik.';
+ else if(h>=14&&h<17)msg='Sore awal: cek area sekolah, pertokoan, dan tempat kerja saat aktivitas pulang mulai meningkat.';
+ else if(h>=17&&h<21)msg='Sore–malam: pantau area kuliner, pasar, dan permukiman. Utamakan tempat aman dan terang.';
+ else msg='Malam larut: permintaan bisa lebih tidak menentu. Utamakan keselamatan, tempat terang, dan istirahat bila lelah.';
+ $('tip').textContent=msg;
+}
+$('locate').onclick=()=>{
+ if(!navigator.geolocation){$('gps').textContent='Browser ini tidak mendukung GPS.';return}
+ $('gps').textContent='Sedang mengambil lokasi…';
+ navigator.geolocation.getCurrentPosition(pos=>{
+  coords={lat:pos.coords.latitude,lon:pos.coords.longitude};
+  $('gps').textContent='Lokasi: '+coords.lat.toFixed(5)+', '+coords.lon.toFixed(5)+' • Akurasi ±'+Math.round(pos.coords.accuracy)+' m';
+  $('maps').disabled=false;
+ },err=>{$('gps').textContent='Lokasi gagal: '+err.message+'. Coba aktifkan Lokasi HP dan izin lokasi browser.'},{enableHighAccuracy:true,timeout:15000,maximumAge:60000});
+};
+$('maps').onclick=()=>{if(coords)location.href='https://www.google.com/maps/search/tempat+ramai/@'+coords.lat+','+coords.lon+',15z'};
+$('orderForm').onsubmit=e=>{
+ e.preventDefault();const amount=Number($('amount').value);if(!Number.isFinite(amount)||amount<0)return;
+ const a=all();a.push({date:dateKey(),area:$('area').value.trim(),amount,time:$('ordertime').value,note:$('note').value.trim()});save(a);
+ $('area').value='';$('amount').value='';$('note').value='';render();
+};
+$('export').onclick=()=>{
+ const rows=[['Tanggal','Area','Jam','Pendapatan','Catatan'],...all().map(x=>[x.date,x.area,x.time,x.amount,x.note])];
+ const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+ const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='catatan-order-maxim.csv';a.click();URL.revokeObjectURL(url);
+};
+$('clear').onclick=()=>{if(confirm('Hapus semua catatan order dari browser ini?')){localStorage.removeItem(key);render()}};
+$('ordertime').value=new Date().toTimeString().slice(0,5);advice();render();
+if('serviceWorker' in navigator && location.protocol.startsWith('http'))navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body></html>
